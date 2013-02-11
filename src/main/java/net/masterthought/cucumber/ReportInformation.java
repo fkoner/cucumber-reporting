@@ -6,7 +6,6 @@ import net.masterthought.cucumber.json.Feature;
 import net.masterthought.cucumber.json.Step;
 import net.masterthought.cucumber.util.Util;
 
-import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -32,6 +31,8 @@ public class ReportInformation {
     private int totalTagSkipped = 0;
     private int totalTagPending = 0;
     private long totalTagDuration = 0l;
+    private int totalPassingTagScenarios = 0;
+    private int totalFailingTagScenarios = 0;
 
     public ReportInformation(Map<String, List<Feature>> projectFeatureMap) {
         this.projectFeatureMap = projectFeatureMap;
@@ -122,6 +123,14 @@ public class ReportInformation {
         return totalTagScenarios;
     }
 
+    public int getTotalPassingTagScenarios() {
+        return totalPassingTagScenarios;
+    }
+
+    public int getTotalFailingTagScenarios() {
+        return totalFailingTagScenarios;
+    }
+
     public int getTotalTagSteps() {
         return totalTagSteps;
     }
@@ -156,7 +165,9 @@ public class ReportInformation {
 
     private void processTags() {
         for (TagObject tag : tagMap) {
-            totalTagScenarios = totalTagScenarios + tag.getScenarios().size();
+            totalTagScenarios = calculateTotalTagScenarios(tag);
+            totalPassingTagScenarios = calculateTotalTagScenariosForStatus(totalPassingTagScenarios, tag, Util.Status.PASSED);
+            totalFailingTagScenarios = calculateTotalTagScenariosForStatus(totalFailingTagScenarios, tag, Util.Status.FAILED);
             totalTagPasses += tag.getNumberOfPasses();
             totalTagFails += tag.getNumberOfFailures();
             totalTagSkipped += tag.getNumberOfSkipped();
@@ -164,15 +175,40 @@ public class ReportInformation {
 
 
             for (ScenarioTag scenarioTag : tag.getScenarios()) {
+
                 if (Util.hasSteps(scenarioTag)) {
                     Step[] steps = scenarioTag.getScenario().getSteps();
+                    List<Step> stepList = new ArrayList<Step>();
                     for (Step step : steps) {
-                        totalTagSteps += steps.length;
+                        stepList.add(step);
                         totalTagDuration = totalTagDuration + step.getDuration();
                     }
+                    totalTagSteps += stepList.size();
                 }
             }
         }
+    }
+
+    private int calculateTotalTagScenariosForStatus(int totalScenarios,TagObject tag, Util.Status status) {
+        List<ScenarioTag> scenarioTagList = new ArrayList<ScenarioTag>();
+        for (ScenarioTag scenarioTag : tag.getScenarios()) {
+            if (!scenarioTag.getScenario().getKeyword().equals("Background")) {
+                if (scenarioTag.getScenario().getStatus().equals(status)) {
+                    scenarioTagList.add(scenarioTag);
+                }
+            }
+        }
+        return totalScenarios + scenarioTagList.size();
+    }
+
+    private int calculateTotalTagScenarios(TagObject tag) {
+        List<ScenarioTag> scenarioTagList = new ArrayList<ScenarioTag>();
+        for (ScenarioTag scenarioTag : tag.getScenarios()) {
+            if (!scenarioTag.getScenario().getKeyword().equals("Background")) {
+                scenarioTagList.add(scenarioTag);
+            }
+        }
+        return totalTagScenarios + scenarioTagList.size();
     }
 
     private void processFeatures() {
@@ -180,13 +216,14 @@ public class ReportInformation {
             List<ScenarioTag> scenarioList = new ArrayList<ScenarioTag>();
             Element[] scenarios = feature.getElements();
             if (Util.itemExists(scenarios)) {
-                numberOfScenarios = numberOfScenarios + scenarios.length;
+                numberOfScenarios = getNumberOfScenarios(scenarios);
                 for (Element scenario : scenarios) {
                     String scenarioName = scenario.getRawName();
 
-                    numberPassingScenarios = Util.setScenarioStatus(numberPassingScenarios, scenario, scenario.getStatus(), Util.Status.PASSED);
-                    numberFailingScenarios = Util.setScenarioStatus(numberFailingScenarios, scenario, scenario.getStatus(), Util.Status.FAILED);
-
+                    if (!scenario.getKeyword().equals("Background")) {
+                        numberPassingScenarios = Util.setScenarioStatus(numberPassingScenarios, scenario, scenario.getStatus(), Util.Status.PASSED);
+                        numberFailingScenarios = Util.setScenarioStatus(numberFailingScenarios, scenario, scenario.getStatus(), Util.Status.FAILED);
+                    }
                     //process tags
                     if (feature.hasTags()) {
                         scenarioList.add(new ScenarioTag(scenario, feature.getFileName()));
@@ -210,11 +247,11 @@ public class ReportInformation {
                             if (ConfigurationOptions.artifactsEnabled()) {
                                 Map<String, Artifact> map = ConfigurationOptions.artifactConfig();
                                 String mapKey = scenarioName + stepName;
-                                if(map.containsKey(mapKey)){
+                                if (map.containsKey(mapKey)) {
                                     Artifact artifact = map.get(mapKey);
                                     String keyword = artifact.getKeyword();
                                     String contentType = artifact.getContentType();
-                                    step.setName(stepName.replaceFirst(keyword, getArtifactFile(mapKey,keyword,artifact.getArtifactFile(),contentType)));
+                                    step.setName(stepName.replaceFirst(keyword, getArtifactFile(mapKey, keyword, artifact.getArtifactFile(), contentType)));
                                 }
                             }
 
@@ -233,11 +270,21 @@ public class ReportInformation {
         processTags();
     }
 
-    private String getArtifactFile(String mapKey, String keyword, String artifactFile, String contentType){
-        mapKey = mapKey.replaceAll(" ","_");
+    private int getNumberOfScenarios(Element[] scenarios) {
+        List<Element> scenarioList = new ArrayList<Element>();
+        for (Element scenario : scenarios) {
+            if (!scenario.getKeyword().equals("Background")) {
+                scenarioList.add(scenario);
+            }
+        }
+        return numberOfScenarios + scenarioList.size();
+    }
+
+    private String getArtifactFile(String mapKey, String keyword, String artifactFile, String contentType) {
+        mapKey = mapKey.replaceAll(" ", "_");
         String link = "";
-        if(contentType.equals("xml")){
-          link = "<div style=\"display:none;\"><textarea id=\"" + mapKey + "\" class=\"brush: xml;\"></textarea></div><a onclick=\"applyArtifact('" + mapKey + "','" + artifactFile +"')\" href=\"#\">" + keyword + "</a>";
+        if (contentType.equals("xml")) {
+            link = "<div style=\"display:none;\"><textarea id=\"" + mapKey + "\" class=\"brush: xml;\"></textarea></div><a onclick=\"applyArtifact('" + mapKey + "','" + artifactFile + "')\" href=\"#\">" + keyword + "</a>";
         } else {
             link = "<div style=\"display:none;\"><textarea id=\"" + mapKey + "\"></textarea></div><script>\\$('#" + mapKey + "').load('" + artifactFile + "')</script><a onclick=\"\\$('#" + mapKey + "').dialog();\" href=\"#\">" + keyword + "</a>";
         }
