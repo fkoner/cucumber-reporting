@@ -25,19 +25,12 @@ public class FeatureTest {
     public void setUpJsonReports() throws IOException {
         List<String> jsonReports = new ArrayList<String>();
         jsonReports.add(getAbsolutePathFromResource("net/masterthought/cucumber/project1.json"));
-        jsonReports.add(getAbsolutePathFromResource("net/masterthought/cucumber/project2.json"));
         reportParser = new ReportParser(jsonReports);
         passingFeature = reportParser.getFeatures().entrySet().iterator().next().getValue().get(0);
         failingFeature = reportParser.getFeatures().entrySet().iterator().next().getValue().get(1);
         passingFeature.processSteps();
         failingFeature.processSteps();
     }
-
-//    @Test
-//    public void shouldReturnListOfScenarios() throws IOException {
-//        assertThat(feature.getElements()[0], is(Element.class));
-//        assertThat(feature.getElements().length, is(4));
-//    }
 
     @Test
     public void shouldReturnManagedFileName() {
@@ -126,11 +119,10 @@ public class FeatureTest {
         assertThat(passingFeature.getDurationOfSteps(), StringContains.containsString("ms"));
     }
 
-//    @Test
-//    public void shouldGetNumberOScenarios() {
-//        assertThat(feature.getNumberOfScenarios(), is(4));
-//
-//    }
+    @Test
+    public void shouldGetNumberOScenarios() {
+        assertThat(passingFeature.getNumberOfScenarios(), is(4));
+    }
 
     @Test
     public void shouldProcessFeatureWhenNoScenarios() throws IOException {
@@ -141,5 +133,13 @@ public class FeatureTest {
         feature.processSteps();
     }
 
+    @Test
+    public void shouldGetNumberOfPassingScenarios() {
+        assertThat(passingFeature.getNumberOfScenariosPassed(), is(4));
+    }
 
+    @Test
+    public void shouldGetNumberOfFailingScenarios() {
+        assertThat(failingFeature.getNumberOfScenariosFailed(), is(1));
+    }
 }
